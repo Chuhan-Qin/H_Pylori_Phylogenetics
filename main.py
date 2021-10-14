@@ -3,8 +3,10 @@ import csv
 import urllib.request as urlr
 import ssl
 import os
+import gzip
+import socket
 
-print("Working on your data set, please wait....")
+print("Working on the data set, please wait....")
 species = "Helicobacter pylori"
 sample_id_list = []
 sample_id_path = []
@@ -123,18 +125,111 @@ with open('output.csv', 'w+') as output_csv:
     for i in id_output_array:
         writer.writerow(i)
 
-print("All Done.")
-
 # download metadata from ENA
 ssl._create_default_https_context = ssl._create_unverified_context
 def downloaddata(url, path):
-    down = urlr.urlopen(url)
-    with open(path,'w+') as f:
-        f.write(str(down.read()))
+    counter = 1
+    while counter <= 5:
+        try:
+            down = urlr.urlopen(url, timeout = 2)
+            with open(path,'w+') as f:
+                f.write(str(down.read()))
+                break
+        except:
+            counter += 1
+    if counter > 5:
+        return(0)
 
+# create directory for ENA data
 if os.path.exists("./ENADATA") == False:
     os.makedirs("./ENADATA")
 else:
     pass
+
+print("Downloading data from ENA...")
+download_data_ena_failed = []
+print("Current downloading:")
 for ID in sample_id_list:
-    downloaddata("https://www.ebi.ac.uk/ena/browser/api/xml/"+ID+"?download=true", "./ENADATA/"+ID+".xml")
+    print('\r'+">>>>"+ID+".xml<<<<", end='', flush=True)
+    if downloaddata("https://www.ebi.ac.uk/ena/browser/api/xml/"+ID+"?download=true", "./ENADATA/"+ID+".xml") == 0:
+        download_data_ena_failed.append(ID)
+        pass
+
+# Export failed downloads
+print("\n"+"Download completed,",str(len(download_data_ena_failed)),"failed.")
+if len(download_data_ena_failed) != 0:
+    print("Outputting failed sample ID to ./ENADATA/Failure.txt")
+    with open("./ENADATA/Failure.txt", "w+") as f:
+        for i in download_data_ena_failed:
+            f.write(i[0]+':'+i[1])
+
+# process the paths, get ready for download
+sample_id_path_processed = []
+for i in sample_id_path:
+    i_trim = i[1][8:]
+    sample_id_path_processed.append(i_trim)
+
+# create directory for genome data
+if os.path.exists("./WHOLE_GENOME_SEQUENCE") == False:
+    os.makedirs("./WHOLE_GENOME_SEQUENCE")
+else:
+    pass
+
+# download from ftp server
+print("Downloading required data from ftp server...")
+downloaded_data = []
+download_data_ftp_failed = []
+socket.setdefaulttimeout(2)
+i = 0
+print("Current downloading:")
+for path in sample_id_path_processed:
+    print(downloaded_data)
+    counter = 1
+    while counter<=5:
+        print('\r'+">>>>"+sample_id_path[i][0]+".contigs.fa.gz<<<<", end='', flush=True)
+        try:
+            urlr.urlretrieve("http://ftp.ebi.ac.uk" + path, "./WHOLE_GENOME_SEQUENCE/" + sample_id_path[i][0] + ".contigs.fa.gz")
+            downloaded_data.append(sample_id_path[i][0])
+            i += 1
+            break
+        except socket.timeout:
+            counter += 1
+            pass
+    if counter > 5:
+        download_data_ftp_failed.append([sample_id_path[i][0], "http://ftp.ebi.ac.uk" + path])
+
+print("Download completed,",str(len(download_data_ftp_failed)),"failed.")
+
+# Export failed downloads
+if len(download_data_ftp_failed) != 0:
+    print('\n'+"Outputting failed sample ID to ./WHOLE_GENOME_SEQUENCE/Failure.txt")
+    with open("./ENADATA/Failure.txt", "w+") as f:
+        for i in download_data_ftp_failed:
+            f.write(i)
+
+# unzip the genome data
+print("Unzipping downloaded data...")
+if not os.path.exists("./WHOLE_GENOME_SEQUENCE_unzipped"):
+    os.makedirs("./WHOLE_GENOME_SEQUENCE_unzipped")
+else:
+    pass
+
+print("Currently unzipping:")
+for i in downloaded_data:
+    print('\r' + ">>>>" + i + ".contigs.fa.gz<<<<", end='', flush=True)
+    with open("./WHOLE_GENOME_SEQUENCE_unzipped/" + i + ".fa","w+") as f:
+        unzip = gzip.GzipFile("./WHOLE_GENOME_SEQUENCE/" + i + ".contigs.fa.gz")
+        while True:
+            line = str(unzip.readline())
+            if len(line) <= 3:
+                break
+            else:
+                line = line[2:-3]
+                f.write(line+'\n')
+print("\n"+"Unzip completed.")
+
+print("All done.")
+
+
+
+
