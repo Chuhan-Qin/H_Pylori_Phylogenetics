@@ -5,7 +5,21 @@ import ssl
 import os
 import gzip
 import socket
+import eutils
+from Bio import Entrez
+from Bio import SeqIO
 
+import sys
+from typing import List
+
+from ncbi.datasets.openapi import ApiClient as DatasetsApiClient
+from ncbi.datasets.openapi import ApiException as DatasetsApiException
+from ncbi.datasets.openapi import GenomeApi as DatasetsGenomeApi
+from ncbi.datasets.metadata.genome import get_assembly_metadata_by_taxon
+
+from ncbi.datasets.package import dataset
+
+"""
 print("Working on the data set, please wait....")
 species = "Helicobacter pylori"
 sample_id_list = []
@@ -228,8 +242,378 @@ for i in downloaded_data:
                 f.write(line+'\n')
 print("\n"+"Unzip completed.")
 
-print("All done.")
+"""
 
+"""
 
+path = "//wsl$/Ubuntu/home/chuhan_duke/refseq/bacteria"
+ncbi_id = []
+print("Unzipping downloaded data...")
+if not os.path.exists("./NCBI_GENOME_unzipped"):
+    os.makedirs("./NCBI_GENOME_unzipped")
+else:
+    pass
 
+for root, directories, files in os.walk(path):
+    for i in files:
+        if i.endswith(".fna.gz") == True:
+            ncbi_id.append(i)
+            print('\r' + "Unzipping: >>>>" + i + "<<<<", end='', flush=True)
+            with open("./NCBI_GENOME_unzipped/" + i[:-3], "w+") as f:
+                unzip = gzip.GzipFile(os.path.join(root,i))
+                while True:
+                    line = str(unzip.readline())
+                    if len(line) <= 3:
+                        break
+                    else:
+                        line = line[2:-3]
+                        f.write(line + '\n')
+print("\n" + "Unzip completed.")
 
+"""
+
+"""
+print("Currently unzipping:")
+for i in downloaded_data:
+    print('\r' + ">>>>" + i + ".contigs.fa.gz<<<<", end='', flush=True)
+    with open("./NCBI_GENOME_unzipped/" + i + ".fa","w+") as f:
+        unzip = gzip.GzipFile("./NCBI_GENOME/" + i + ".contigs.fa.gz")
+        while True:
+            line = str(unzip.readline())
+            if len(line) <= 3:
+                break
+            else:
+                line = line[2:-3]
+                f.write(line+'\n')
+print("\n"+"Unzip completed.")
+"""
+"""
+print("Fetching data from NCBI...")
+from selenium import webdriver
+from time import sleep
+
+sel_col = '//*[@id="select-columns__open-dialog"]'
+check_bio = '//*[@id="chk-col-biosample"]'
+apply = '//*[@id="select-columns__dialog__apply"]'
+rows = '//*[@id="maincontent"]/div[2]/div/div/div/div[4]/div[3]/div[1]/div[2]/div[1]'
+twohun_row = '//*[@id="maincontent"]/div[2]/div/div/div/div[4]/div[3]/div[1]/div[2]/div[2]/ul/li[5]'
+next_page = '/html/body/div[3]/main/div[2]/div/div/div/div[4]/div[3]/div[3]/button[2]'
+
+browser = webdriver.Chrome()
+browser.maximize_window()
+sleep(5)
+browser.get("https://www.ncbi.nlm.nih.gov/datasets/genomes/?taxon=210")
+sleep(5)
+browser.find_element_by_xpath(sel_col).click()
+sleep(2)
+browser.find_element_by_xpath(check_bio).click()
+sleep(2)
+browser.find_element_by_xpath(apply).click()
+sleep(2)
+browser.find_element_by_xpath(rows).click()
+sleep(2)
+browser.find_element_by_xpath(twohun_row).click()
+sleep(5)
+
+NCBI_ID = []
+NCBI_ID_2 = []
+ENA_ID = []
+page = 1
+while page <= 27:
+    print('\r', 'Fetching Page', page, end='', flush=True)
+    if page == 1:
+        ID_web = browser.find_element_by_xpath( '//*[@id="DataTables_Table_0"]/tbody/tr[1]/td[3]/span[1]')
+        ID = ID_web.text
+        NCBI_ID.append(ID)
+        ID_web = browser.find_element_by_xpath( '//*[@id="DataTables_Table_0"]/tbody/tr[1]/td[3]/span[3]')
+        ID = ID_web.text
+        NCBI_ID_2.append(ID)
+        ID_web = browser.find_element_by_xpath( '//*[@id="DataTables_Table_0"]/tbody/tr[1]/td[8]')
+        ID = ID_web.text
+        ENA_ID.append(ID)
+        i = 2;
+        while i <= 200:
+            ID_web = browser.find_element_by_xpath(
+                                          '//*[@id="DataTables_Table_0"]/tbody/tr[' + str(i) + ']/td[3]/span[1]')
+            ID = ID_web.text
+            NCBI_ID.append(ID)
+            ID_web = browser.find_element_by_xpath(
+                                          '//*[@id="DataTables_Table_0"]/tbody/tr[' + str(i) + ']/td[3]/span[2]')
+            ID = ID_web.text
+            NCBI_ID_2.append(ID)
+            ID_web = browser.find_element_by_xpath('//*[@id="DataTables_Table_0"]/tbody/tr[' + str(i) + ']/td[8]')
+            ID = ID_web.text
+            ENA_ID.append(ID)
+            i += 1
+        browser.find_element_by_xpath(next_page).click()
+        sleep(3)
+        page += 1
+    if page == 27:
+        i = 1
+        while i <= 125:
+            ID_web = browser.find_element_by_xpath('//*[@id="DataTables_Table_0"]/tbody/tr[' + str(i) + ']/td[3]/span[1]')
+            ID = ID_web.text
+            NCBI_ID.append(ID)
+            ID_web = browser.find_element_by_xpath(
+                                          '//*[@id="DataTables_Table_0"]/tbody/tr[' + str(i) + ']/td[3]/span[2]')
+            ID = ID_web.text
+            NCBI_ID_2.append(ID)
+            ID_web = browser.find_element_by_xpath('//*[@id="DataTables_Table_0"]/tbody/tr[' + str(i) + ']/td[8]')
+            ID = ID_web.text
+            ENA_ID.append(ID)
+            i += 1
+        break
+    else:
+        i = 1;
+        while i <= 200:
+            ID_web = browser.find_element_by_xpath(
+                                          '//*[@id="DataTables_Table_0"]/tbody/tr[' + str(i) + ']/td[3]/span[1]')
+            ID = ID_web.text
+            NCBI_ID.append(ID)
+            ID_web = browser.find_element_by_xpath(
+                                          '//*[@id="DataTables_Table_0"]/tbody/tr[' + str(i) + ']/td[3]/span[2]')
+            ID = ID_web.text
+            NCBI_ID_2.append(ID)
+            ID_web = browser.find_element_by_xpath('//*[@id="DataTables_Table_0"]/tbody/tr[' + str(i) + ']/td[8]')
+            ID = ID_web.text
+            ENA_ID.append(ID)
+            i += 1
+        browser.find_element_by_xpath(next_page).click()
+        sleep(3)
+        page += 1
+sleep(10)
+browser.close()
+print("Completed.")
+
+ID_combined = []
+for index, value in enumerate(ENA_ID):
+    ID_combined.append([value, NCBI_ID[index], NCBI_ID_2[index]])
+
+print('Outputting as csv...')
+with open('IDs.csv', 'w+') as output_csv:
+    writer = csv.writer(output_csv, dialect="unix")
+    for i in ID_combined:
+        writer.writerow(i)
+print("Completed.")
+"""
+
+"""
+print("Mapping additional Genome Sequence File...")
+path = r'D:\PythonProject_H_pylori_genome\1\NCBI_GENOME_unzipped'
+ENA_list_match = []
+ID_1_list = []
+ID_2_list = []
+raw_list = []
+processed_list = []
+unmatched_counter = 0
+with open('IDs.csv', 'r') as f:
+    reader = csv.reader(f)
+    for i in reader:
+        ENA_list_match.append(i[0])
+        i_processed_list = i[2].split(': ')
+        i_processed = i_processed_list[1]
+        ID_2_list.append(i_processed)
+        ID_1_list.append(i[1])
+
+for root, directories, files in os.walk(path):
+    for i in files:
+        raw_list.append(i)
+        i_processed_list = i.split('_')
+        i_processed = i_processed_list[0]+'_'+i_processed_list[1]
+        processed_list.append(i_processed)
+
+with open('ID-path-for-pop.csv', 'w+') as f:
+    writer = csv.writer(f, dialect="unix")
+    for index, value in enumerate(processed_list):
+        if value in ID_2_list:
+            writer.writerow([ENA_list_match[ID_2_list.index(value)], raw_list[index]])
+        else:
+            unmatched_counter += 1
+print("Completed with", unmatched_counter, "failure(s).")
+
+print("Checking possible repeats...")
+path = r'D:\PythonProject_H_pylori_genome\1\WHOLE_GENOME_SEQUENCE_unzipped'
+media = []
+media_2 = []
+repeated = []
+old_re = []
+counter = 0
+with open('ID-path-for-pop.csv','r') as f:
+    reader = csv.reader(f)
+    for i in reader:
+        media.append(i[0])
+        media_2.append(i[1])
+for root, directories, files in os.walk(path):
+    for i in files:
+        i_processed = i.strip('.fa')
+        if i_processed in media:
+            counter += 1
+            repeated.append([i_processed, os.path.join(path, i)])
+        else:
+            old_re.append([i_processed, i])
+
+print('Completed.', counter, "possible repeat(s). Check repeats.txt.")
+
+print('Comparing fasta data of possible repeats...')
+def getMaxmatch(str1, str2, Cap=False):
+    str_a = str(str1)
+    str_b = str(str2)
+    if not str_a or not str_b:
+        return {0:[]}
+    if len(str_a) > len(str_b):
+        str_a, str_b = str_b, str_a
+    if Cap:
+        str_a, str_b = str_a.lower(), str_b.lower()
+    matchDict = {}
+    if str_a in str_b:
+        matchDict[len(str_a)] = [str_a]
+        return matchDict
+    shortstrlen = len(str_a)
+    matchDict[0] = []
+    counter = 0
+    for i in range (0, shortstrlen+1):
+        if counter>=100:
+            break
+        counter += 1
+        for j in range(0, i-1):
+            print('\rMax match length:',max(list(matchDict.keys())), end='', flush=True)
+            subStr = str_a[j:i]
+            if subStr in str_b:
+                if len(subStr) in matchDict.keys():
+                    matchDict[len(subStr)].append(subStr)
+                else:
+                    matchDict[len(subStr)] = [subStr]
+    result = {}
+    maxlen =max(list(matchDict.keys()))
+    result[maxlen] = matchDict[maxlen]
+    return maxlen
+
+for i in repeated:
+    print('\r'+'Comparing '+i[0]+'...: ', end='',flush=True)
+    data_1 = ''
+    data_2 = ''
+    with open (i[1],'r') as f:
+        lines_1 = f.readlines()
+    with open (media_2[media.index(i[0])], 'r') as f:
+        lines_2 = f.readlines()
+    for j in lines_1:
+        data_1 = data_1 + j.strip('\n')
+    for k in lines_2:
+        data_2 = data_2 + k.strip('\n')
+    i.append(getMaxmatch(data_1, data_2))
+with open('repeats.txt', 'w+') as f:
+    for i in repeated:
+        f.write(i[0] + '   ' + i[1] + ' ' + str(i[2]))
+        f.write('\n')
+
+print("Merging the two...")
+path = r'D:\PythonProject_H_pylori_genome\1\WHOLE_GENOME_SEQUENCE_unzipped'
+with open('ID-path-for-pop.csv', 'a+') as f:
+    writer = csv.writer(f, dialect="unix")
+    for i in old_re:
+        writer.writerow(i)
+print('Completed.')
+
+print("preparing Sample-to-Path text for poppunk...")
+media = []
+with open('ID-path-for-pop.csv', 'r') as f:
+    reader = csv.reader(f)
+    for i in reader:
+        media.append(i)
+with open('ID-path-for-pop.txt','w+') as f:
+    for i in media:
+        f.write(i[0] + '	' + i[1])
+        f.write('\n')
+print("Completed.")
+"""
+
+# match SampleID with metadata
+print("Retrieving related metadata...")
+data = xlrd.open_workbook('D:\Python_project\Python_Project\H_pylori_metadata_enterobase.xls')
+table = data.sheets()[0]
+col = table.col_values(26)
+row_header = table.row_values(0)
+row_header.insert(0,'path')
+row_header.insert(0,'SampleID')
+matched_row = []
+matchedID = []
+unmatchedID = []
+id_output_list2 = []
+id_output_array2 = []
+
+with open ('D:/PythonProject_H_pylori_genome/1/hello_visul_microreact_clusters.csv', 'r') as f:
+    reader = csv.reader(f)
+    biosample_id = []
+    i = 0
+    for row in reader:
+        if i == 0:
+            i = i + 1
+        else:
+            biosample_id.append(row[0])
+
+    auto_colour = []
+    i = 0
+    for row in reader:
+        if i == 0:
+            i = i + 1
+        else:
+            auto_colour.append(row[1])
+
+    del_header = []
+    i = 0
+    for row in reader:
+        if i == 0:
+            i = i +1
+        else:
+            del_header.append(row)
+
+workbook = xlrd.open_workbook('D:\Python_project\Python_Project\H_pylori_metadata_enterobase.xls')
+
+sheet = workbook.sheets()[0]
+metadata_id = sheet.col_values(26)
+header = sheet.row_values(0)
+header.insert(0, 'Cluster_Cluster__autocolour')
+header.insert(0, 'id')
+
+for ID in biosample_id:
+    num = 0
+    for i in metadata_id:
+        if ID == i:
+            matched_row.append([ID,num])
+            matchedID.append(ID)
+        num += 1
+
+for ID in biosample_id:
+    count = 0
+    for i in metadata_id:
+        if ID == i:
+            break
+        else:
+            count += 1
+    if count >= len(metadata_id):
+        unmatchedID.append(ID)
+
+for row in del_header:
+    id_output_list2 = [row]
+    # adding metadata to the list
+    count = 0
+    for i in matched_row:
+        if row[0] == i[0]:
+            row_tmp = sheet.row_values(i[1])
+            id_output_list2 = id_output_list2 + row_tmp
+            break
+        else:
+            count += 1
+    if count >= len(matched_row):
+        num = 0
+        while num < 44:
+            num += 1
+            id_output_list2.append("")
+    id_output_array2.append(id_output_list2)
+
+print("Outputting sorted data to microreact.csv")
+with open('microreact.csv', 'w+') as output_csv:
+    writer = csv.writer(output_csv)
+    writer.writerow(row_header)
+    for i in id_output_array2:
+        writer.writerow(i)
