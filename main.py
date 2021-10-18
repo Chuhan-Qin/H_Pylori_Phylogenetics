@@ -6,20 +6,9 @@ import os
 import gzip
 import socket
 import eutils
-from Bio import Entrez
-from Bio import SeqIO
-
 import sys
 from typing import List
 
-from ncbi.datasets.openapi import ApiClient as DatasetsApiClient
-from ncbi.datasets.openapi import ApiException as DatasetsApiException
-from ncbi.datasets.openapi import GenomeApi as DatasetsGenomeApi
-from ncbi.datasets.metadata.genome import get_assembly_metadata_by_taxon
-
-from ncbi.datasets.package import dataset
-
-"""
 print("Working on the data set, please wait....")
 species = "Helicobacter pylori"
 sample_id_list = []
@@ -242,10 +231,6 @@ for i in downloaded_data:
                 f.write(line+'\n')
 print("\n"+"Unzip completed.")
 
-"""
-
-"""
-
 path = "//wsl$/Ubuntu/home/chuhan_duke/refseq/bacteria"
 ncbi_id = []
 print("Unzipping downloaded data...")
@@ -395,9 +380,7 @@ with open('IDs.csv', 'w+') as output_csv:
     for i in ID_combined:
         writer.writerow(i)
 print("Completed.")
-"""
 
-"""
 print("Mapping additional Genome Sequence File...")
 path = r'D:\PythonProject_H_pylori_genome\1\NCBI_GENOME_unzipped'
 ENA_list_match = []
@@ -525,7 +508,6 @@ with open('ID-path-for-pop.txt','w+') as f:
         f.write(i[0] + '	' + i[1])
         f.write('\n')
 print("Completed.")
-"""
 
 # match SampleID with metadata
 print("Retrieving related metadata...")
